@@ -193,7 +193,7 @@ install() {
     run_cmd("artix-chroot /mnt grub-mkconfig -o /boot/grub/grub.cfg", "Failed to make config");
 
     printf("Recommended inputs for the command below. NOTE OR SCREEN SHOT THIS PLEASE.\n");
-    printf("pipewire-jack, Noto Fonts, and again Noto Fonts.");
+    printf("please select pipewire-jack instead of jack2. Everything else, default.");
     
     str _ = sinput("got it?");
 
@@ -203,7 +203,8 @@ install() {
     system("artix-chroot /mnt rc-update add NetworkManager default");
 
     CONFIRM = "";
-    printf("If you do reboot, after reboot run the continue option.");
+    printf("If you do reboot, after doing so run: nmcli device wifi connect \"<wifiname>\" password \"<password>\"\n");
+    printf("After that run: wget https://raw.githubusercontent.com/MikaSukie/LunyAEstro/main/XLookieSukie && chmod +x XLookieSukie && ./XLookieSukie\n");
     CONFIRM = sinput("would you like to reboot? [y/n] ");
 
     if strcmp(tal(CONFIRM), "y") == 0 {
