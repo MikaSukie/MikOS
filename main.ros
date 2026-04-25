@@ -48,9 +48,9 @@ continue_install() {
 
     printf("CONFIGURING PACMAN\n");
     system("sudo sed -i 's/^ParallelDownloads = 5/ParallelDownloads = 8/' /etc/pacman.conf");
-    system("sudo sed -i 's/^#Color/Color/' /etc/pacman.conf");
-    system("sudo sed -i '/^Color/a ILoveCandy' /etc/pacman.conf");
-    system("printf '\\n[lib32]\\nInclude = /etc/pacman.d/mirrorlist\\n' | sudo tee -a /etc/pacman.conf > /dev/null");
+    system("sudo grep -q '^Color' /etc/pacman.conf || sudo sed -i 's/^#Color/Color/' /etc/pacman.conf");
+    system("sudo grep -q '^ILoveCandy' /etc/pacman.conf || sudo sed -i '/^Color/a ILoveCandy' /etc/pacman.conf");
+    system("sudo grep -q '^\\[lib32\\]' /etc/pacman.conf || printf '\\n[lib32]\\nInclude = /etc/pacman.d/mirrorlist\\n' | sudo tee -a /etc/pacman.conf > /dev/null");
 
     CONFIRM = "";
     CONFIRM = sinput("[F]astfetch (regular), [H]yfetch (pride version), [B]oth, or [N]one? ");
