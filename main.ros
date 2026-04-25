@@ -22,6 +22,8 @@ extern system(str command) i32;
 extern sinput(str s) str;
 extern wait(i64 time) void;
 
+extern geteuid() i32;
+
 unsafe extern getenv(nomd str s) str;
 
 main() {
@@ -53,7 +55,7 @@ continue_install() {
     system("sudo grep -q '^\\[lib32\\]' /etc/pacman.conf || printf '\\n[lib32]\\nInclude = /etc/pacman.d/mirrorlist\\n' | sudo tee -a /etc/pacman.conf > /dev/null");
 
     system("sudo pacman -Sy");    
-    system("sudo pacman -S --needed pipewire wireplumber pipewire-alsa pipewire-pulse pipewire-jack pipewire-audio bluez bluez-utils bluez-openrc bluedevil alsa-ucm-conf alsa-card-profiles alsa-utils");
+    system("sudo pacman -S --needed fuse2 spipewire wireplumber pipewire-alsa pipewire-pulse pipewire-jack pipewire-audio bluez bluez-utils bluez-openrc bluedevil alsa-ucm-conf alsa-card-profiles alsa-utils zip unzip");
 
     CONFIRM = "";
     CONFIRM = sinput("[F]astfetch (regular), [H]yfetch (pride version), [B]oth, or [N]one? ");
@@ -96,8 +98,9 @@ continue_install() {
         system("paru -Sy vlc vlc-plugins-all kdenlive libreoffice-fresh uv git obs-studio discord vencord-installer-bin steam qbittorrent wine wine-{gecko,mono} gnutls sdl2-compat gst-plugins-{base,good,bad,ugly} winetricks ffmpeg docker docker-compose docker-buildx php reflector nmap bind sshfs kdeconnect btop noto-fonts-{extra,emoji,cjk} krita teams-for-linux-bin ttf-jetbrains-mono-nerd hyfetch gwenview ark partitionmanager zip unzip downgrade nvm syncthing obsidian prismlauncher librewolf-bin gram-editor-bin 7z rar kcalc handbrake fluxer-bin pycharm prusa-slicer easyeffects yt-dlp parabolic blender kompare godot hyfetch fastfetch tenacity rar sqlitebrowser gram xclicker --noconfirm --needed && paru -Sy phantomjs python-{xattr,brotli,websockets,pycryptdome,mutagen,curl_cffi} aria2 atomicparsley noise-suppression-for-voice kimageformats lsp-plugins calf zam-plugins --needed --asdeps --noconfirm && paru -Sy catppuccin-plasma-colorscheme-mocha catppuccin-gtk-theme-mocha catppuccin-cursors-mocha kio-admin dolphin-plugins kde-inotify-survey kde-pim kcolorchooser kdialog kcalc kolourpaint okular plasma-systemmonitor filelight spectacle krita kolourpaint kwallet kwalletmanager --needed --noconfirm && paru -Sy cups cups-pdf print-manager system-config-printer epson-inkjet-printer-escpr{,2} --needed --noconfirm && paru -Sy --noconfirm --needed zsh zsh-completions && sh -c \"$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)\" && paru -Sy --noconfirm --needed vmware-keymaps vmware-workstation && sudo rc-update add vmware-networks default && sudo rc-update add vmware-usbarbitrator default && sudo rc-service vmware-networks start && sudo rc-service vmware-usbarbitrator start");
     } else {
         printf("\nok byeee!\n");
-        exit(0);
     }
+    printf("Also it is recommended to restart for drivers to apply.");
+    exit(0);
 }
 
 install_fastfetch(str DEFAULTUSER) {
@@ -111,18 +114,20 @@ install_hyfetch(str DEFAULTUSER) {
     system("sudo pacman -S hyfetch");
     printf("Please Configure hyfetch!");
     system("hyfetch");
-    wait(2000);
+    wait(5000);
     run_cmd("cd /home/" + DEFAULTUSER + "/.config/" + " && jq '.custom_ascii_path = \"/home/" + DEFAULTUSER + "/.config/fastfetch/logo.txt\"' hyfetch.json > tmp.json && mv tmp.json hyfetch.json", "Failed to install ascii config!");
     printf("\nASCII installed!");
 }
 
 install() {
+    if geteuid() != 0 { printf("Please run as sudo/superuser/su root/root\n"); exit(1); }
     printf("====WARNING! WILL WIP YOUR DRIVE====\n");
     printf("You do need to manually partition your drives.\n");
     printf("This is for customizability reasons\n\n");
     
     printf("Please answer the questions in just lsblk partition names.\n");
-    printf("EX: sda1 nvme0n1p1\n");
+    printf("EX: sda1 (disks will be listed below)\n");
+    system("lsblk -f");
 
     str boot = sinput("What is your boot drive? (EFI portion ~512MB) ");
     str root = sinput("Root drive? (containing Home usually ext4) ");
@@ -201,12 +206,12 @@ install() {
     run_cmd("artix-chroot /mnt grub-mkconfig -o /boot/grub/grub.cfg", "Failed to make config");
 
     printf("Recommended inputs for the command below. NOTE OR SCREEN SHOT THIS PLEASE.\n");
-    printf("please select pipewire-jack instead of jack2 and MAKE SURE Tessaract matches your language.\nEverything else, default.");
+    printf("please MAKE SURE Tessaract matches your language, and use NotoFonts.\nEverything else, default.\n");
     
-    str _ = sinput("got it? [y/y]");
+    str _ = sinput("Got it? [y/y] ");
 
     CONFIRM = "";
-    CONFIRM = sinput("[F]ull KDE + apps, just [L]ight kde install, or [N]o Desktop Environment?");
+    CONFIRM = sinput("[F]ull KDE + apps, just [L]ight kde install, or [N]o Desktop Environment? ");
 
     if strcmp(tal(CONFIRM), "f") == 0 {
         install_kde(true);
@@ -217,10 +222,16 @@ install() {
     }
     system("artix-chroot /mnt rc-update add NetworkManager default");
 
+    system("printf 'NAME=\"LunyAEstro Linux\"\nPRETTY_NAME=\"LunyAEstro\"\nID=lunyaestro\nBUILD_ID=rolling\nANSI_COLOR=\"1;35\"\nLOGO=LunyAEstro\n' | sudo tee /mnt/etc/os-release > /dev/null");
+
+    str user_next = sinput("which user will you log-into after reboot? ");
+    system("mv LunyAEstro /mnt/home/" + tal(user_next) + "/LunyAEstro");
+
     CONFIRM = "";
     printf("If you do reboot, after doing so run: nmcli device wifi connect \"<wifiname>\" password \"<password>\"\n");
-    printf("After that run: wget https://raw.githubusercontent.com/MikaSukie/LunyAEstro/main/XLookieSukie && chmod +x XLookieSukie && ./XLookieSukie\n");
-    CONFIRM = sinput("would you like to reboot? [y/n] ");
+    printf("After that run: ./LookieSukie\n");
+    
+    CONFIRM = sinput("\nwould you like to reboot? [y/n] ");
 
     if strcmp(tal(CONFIRM), "y") == 0 {
         system("sudo reboot");
