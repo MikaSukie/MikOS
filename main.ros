@@ -299,7 +299,7 @@ install() {
 
     CONFIRM = "";
     printf("If you do reboot, after doing so run: nmcli device wifi connect \"<wifiname>\" password \"<password>\"\n");
-    printf("After that run: ./LookieSukie\n");
+    printf("After that run: ./MikOS\n");
 
     CONFIRM = input("\nwould you like to reboot? [y/n] ");
 
