@@ -105,6 +105,27 @@ continue_install() {
     system("sudo pacman -Sy");
     system("sudo pacman -S --needed fuse2 pipewire wireplumber pipewire-alsa pipewire-pulse pipewire-jack pipewire-audio bluez bluez-utils " + init_pkg("bluez") + " bluedevil alsa-ucm-conf alsa-card-profiles alsa-utils zip unzip");
 
+    printf("INSTALLING SOUND DRIVERS (%s)\n", init_system);
+    if strcmp(init_system, "openrc") == 0 {
+        system("sudo pacman -S --needed pipewire-openrc pipewire-pulse-openrc wireplumber-openrc");
+        system("sudo rc-service -U pipewire start");
+        system("sudo rc-service -U pipewire-pulse start");
+        system("sudo rc-service -U wireplumber start");
+        system("rc-update add -U pipewire default");
+        system("rc-update add -U pipewire-pulse default");
+        system("rc-update add -U wireplumber default");
+    } else if strcmp(init_system, "dinit") == 0 {
+        system("sudo pacman -S --needed pipewire-dinit wireplumber-dinit");
+        system("dinitctl start --user pipewire");
+        system("dinitctl start --user wireplumber");
+        system("dinitctl start --user pipewire-pulse");
+        enable_service("pipewire");
+        enable_service("wireplumber");
+        enable_service("pipewire-pulse");
+    } else {
+        printf("Runit: PipeWire will be started via autostart desktop entries.\n");
+    }
+
     CONFIRM = "";
     CONFIRM = input("[F]astfetch (regular), [H]yfetch (pride version), [B]oth, or [N]one? ");
     system("sudo pacman -Sy");
