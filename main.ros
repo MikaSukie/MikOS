@@ -105,7 +105,8 @@ continue_install() {
     system("sudo pacman -Sy");
     system("sudo pacman -S --needed fuse2 pipewire wireplumber pipewire-alsa pipewire-pulse pipewire-jack pipewire-audio bluez bluez-utils " + init_pkg("bluez") + " bluedevil alsa-ucm-conf alsa-card-profiles alsa-utils zip unzip");
 
-    install_nvidia();
+    str CONFIRM = input("Do you want NVIDIA drivers? [y/n] ");
+    if strcmp(tal(CONFIRM), "y") == 0 { install_nvidia(); }
 
     printf("INSTALLING SOUND DRIVERS (%s)\n", init_system);
     if strcmp(init_system, "openrc") == 0 {
