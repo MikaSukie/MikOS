@@ -2,7 +2,7 @@
  * Rosaline MikOS Install Script
  */
 
-nomd str NULL = (void*)0;
+nomd i8* NULL = (void*)0;
 opaque FILE;
 extern stdout FILE*;
 extern stdin FILE*;
@@ -95,7 +95,7 @@ continue_install() {
     str CONFIRM = input("Are you sure you want to continue? [y/n] ");
     if strcmp(tal(CONFIRM), "y") == 0 {}
     else { printf("User quitted."); exit(0); }
-    
+
     printf("CONFIGURING PACMAN\n");
     system("sudo sed -i 's/^ParallelDownloads = 5/ParallelDownloads = 8/' /etc/pacman.conf");
     system("sudo grep -q '^Color' /etc/pacman.conf || sudo sed -i 's/^#Color/Color/' /etc/pacman.conf");
@@ -104,6 +104,8 @@ continue_install() {
 
     system("sudo pacman -Sy");
     system("sudo pacman -S --needed fuse2 pipewire wireplumber pipewire-alsa pipewire-pulse pipewire-jack pipewire-audio bluez bluez-utils " + init_pkg("bluez") + " bluedevil alsa-ucm-conf alsa-card-profiles alsa-utils zip unzip");
+
+    install_nvidia();
 
     printf("INSTALLING SOUND DRIVERS (%s)\n", init_system);
     if strcmp(init_system, "openrc") == 0 {
@@ -346,6 +348,81 @@ run_cmd(str command, str errormessage) {
         printf(errormessage);
         exit(1);
     }
+}
+
+install_nvidia() {
+    printf("Configuring NVIDIA (safe rerun, auto-detecting legacy branch)...\n");
+
+    system(`
+        sudo bash -c '
+        set -euo pipefail
+
+        gpu="$(lspci -nn | grep -Ei "VGA|3D controller|Display controller" | grep -i NVIDIA | head -n1 || true)"
+
+        branch=modern
+        if printf "%s" "$gpu" | grep -qE "GF[0-9]{3}"; then
+            branch=390xx
+        elif printf "%s" "$gpu" | grep -qE "GK[0-9]{3}"; then
+            branch=470xx
+        fi
+
+        if [ "$branch" = "390xx" ]; then
+            pkgs="nvidia-390xx-dkms nvidia-390xx-utils opencl-nvidia-390xx lib32-nvidia-390xx-utils lib32-opencl-nvidia-390xx nvidia-390xx-settings"
+        elif [ "$branch" = "470xx" ]; then
+            pkgs="nvidia-470xx-dkms nvidia-470xx-utils opencl-nvidia-470xx lib32-nvidia-470xx-utils lib32-opencl-nvidia-470xx nvidia-470xx-settings"
+        else
+            if pacman -Si nvidia-580xx-dkms >/dev/null 2>&1; then
+                pkgs="nvidia-580xx-dkms nvidia-580xx-utils opencl-nvidia-580xx lib32-nvidia-580xx-utils lib32-opencl-nvidia-580xx nvidia-580xx-settings"
+            else
+                pkgs="nvidia-dkms nvidia-utils opencl-nvidia lib32-nvidia-utils lib32-opencl-nvidia nvidia-settings"
+            fi
+        fi
+
+        base_pkg="$(printf "%s" "$pkgs" | awk '"'"'{print $1}'"'"')"
+
+        mkdir -p /etc/pacman.d/hooks
+        cat > /etc/pacman.d/hooks/nvidia.hook <<HOOKEOF
+        [Trigger]
+        Operation=Install
+        Operation=Upgrade
+        Operation=Remove
+        Type=Package
+        Target=${base_pkg}
+
+        [Action]
+        Depends=mkinitcpio
+        When=PostTransaction
+        Exec=/usr/bin/mkinitcpio -P
+        HOOKEOF
+
+        pacman -S --needed --noconfirm $pkgs
+
+        grep -q "^MODULES=.*nvidia.*nvidia_modeset.*nvidia_uvm.*nvidia_drm" /etc/mkinitcpio.conf \
+            || sed -i -E "s/^MODULES=.*/MODULES=(nvidia nvidia_modeset nvidia_uvm nvidia_drm)/" /etc/mkinitcpio.conf
+
+        if grep -q "nvidia-drm.modeset=1" /etc/default/grub; then
+            :
+        elif grep -q "^GRUB_CMDLINE_LINUX_DEFAULT=" /etc/default/grub; then
+            sed -i -E "s/^(GRUB_CMDLINE_LINUX_DEFAULT=\"[^\"]*)\"/\1 nvidia-drm.modeset=1\"/" /etc/default/grub
+        else
+            printf "%s\n" "GRUB_CMDLINE_LINUX_DEFAULT=\"loglevel=3 quiet nvidia-drm.modeset=1\"" >> /etc/default/grub
+        fi
+
+        mkinitcpio -P
+        grub-mkconfig -o /boot/grub/grub.cfg
+
+        cat > /usr/local/bin/prime-run <<PRIMEEOF
+        #!/bin/bash
+        __NV_PRIME_RENDER_OFFLOAD=1 \
+        __VK_LAYER_NV_optimus=NVIDIA_only \
+        __GLX_VENDOR_LIBRARY_NAME=nvidia \
+        "$@"
+        PRIMEEOF
+
+        chmod +x /usr/local/bin/prime-run
+        '
+    `);
+    printf("NVIDIA install finished. Reboot recommended.\n");
 }
 
 ansi(str s) void {
